@@ -39,3 +39,10 @@ python -m analytics.synthetic.scenario_generator --api-url http://localhost:8000
 ## Repo File Map
 
 See `docs/file_map.md` for a detailed file-by-file description.
+
+## Venv Setup
+
+```bash
+./scripts/setup_venv.sh
+source .venv/bin/activate
+```
