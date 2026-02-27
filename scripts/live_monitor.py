@@ -76,6 +76,7 @@ def run_plot(db_path: str, interval: float, limit: int):
     plt.ylabel("Values")
     plt.xlim(0, limit)
 
+    last_ts = None
     while True:
         rows = fetch_series(db_path, limit=limit)
         if rows:
@@ -83,6 +84,7 @@ def run_plot(db_path: str, interval: float, limit: int):
             mold = [r["idx_mold_now"] or 0.0 for r in rows]
             pred = [r["pred_idx_mold_h"] or 0.0 for r in rows]
             x = list(range(len(rows)))
+            latest_ts = rows[-1]["ts"]
 
             plt.clt()
             plt.cld()
@@ -90,7 +92,11 @@ def run_plot(db_path: str, interval: float, limit: int):
             plt.plot(x, mold)
             plt.plot(x, pred)
             plt.plotsize(100, 30)
+            plt.title(f"Live Mold Monitoring | latest ts: {latest_ts}")
             plt.show()
+            if latest_ts == last_ts:
+                print(f"No new data (latest ts still {latest_ts}).")
+            last_ts = latest_ts
         time.sleep(interval)
 
 
