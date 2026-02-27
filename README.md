@@ -47,6 +47,12 @@ See `docs/file_map.md` for a detailed file-by-file description.
 source .venv/bin/activate
 ```
 
+## Demo GUI (Tkinter)
+
+```bash
+python scripts/tk_demo_gui.py --db /home/amrik/code/smart-campus/data/smart_campus.db
+```
+
 ## ML Demo (Mold Model)
 
 ```bash

@@ -8,6 +8,9 @@ class Settings:
         self.alert_threshold = float(os.getenv("ALERT_THRESHOLD", "0.6"))
         self.alert_consecutive = int(os.getenv("ALERT_CONSECUTIVE", "3"))
         self.flatline_window = int(os.getenv("FLATLINE_WINDOW", "5"))
+        # Retention controls to prevent SQLite growth in demos
+        self.retention_days = int(os.getenv("RETENTION_DAYS", "7"))
+        self.retention_max_rows = int(os.getenv("RETENTION_MAX_ROWS", "50000"))
         self.qc_ranges = {
             "air_temp_c": (0.0, 50.0),
             "air_rh_pct": (0.0, 100.0),

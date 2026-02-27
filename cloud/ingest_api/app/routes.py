@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import timedelta, timezone
 from typing import Dict, List, Tuple
 
 from fastapi import APIRouter, Depends
@@ -104,10 +104,33 @@ def _extract_mold_history(rows: List[models.RawTelemetry]) -> List[Tuple[float, 
 def _extract_water_history(rows: List[models.RawTelemetry]) -> List[Tuple[float, float, float]]:
     return [(r.water_turbidity_ntu, r.water_free_chlorine_mgL, r.water_conductivity_uScm) for r in rows]
 
+def _apply_retention(db: Session) -> None:
+    # Time-based retention
+    if settings.retention_days > 0:
+        cutoff = datetime.utcnow() - timedelta(days=settings.retention_days)
+        db.query(models.RawTelemetry).filter(models.RawTelemetry.ts < cutoff).delete()
+        db.query(models.Feature).filter(models.Feature.ts < cutoff).delete()
+        db.query(models.Prediction).filter(models.Prediction.ts < cutoff).delete()
+        db.query(models.Alert).filter(models.Alert.ts < cutoff).delete()
+
+    # Size-based retention (keep most recent N rows)
+    max_rows = settings.retention_max_rows
+    if max_rows > 0:
+        for model in (models.RawTelemetry, models.Feature, models.Prediction, models.Alert):
+            rows = db.query(model.id).order_by(model.id.desc()).offset(max_rows).all()
+            if rows:
+                cutoff_id = rows[-1][0]
+                db.query(model).filter(model.id <= cutoff_id).delete()
+
 
 @router.post("/telemetry", response_model=schemas.TelemetryOut)
 def ingest_telemetry(payload: schemas.TelemetryIn, db: Session = Depends(get_db)):
-    raw = models.RawTelemetry(**payload.dict())
+    # Normalize to naive UTC for SQLite
+    ts = payload.ts
+    if ts.tzinfo is not None:
+        ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
+
+    raw = models.RawTelemetry(**payload.dict(exclude={"ts"}), ts=ts)
     db.add(raw)
     db.flush()
 
@@ -135,13 +158,13 @@ def ingest_telemetry(payload: schemas.TelemetryIn, db: Session = Depends(get_db)
         .first()
     )
     if prev_feature:
-        dt_min = max(1.0, (payload.ts - prev_feature.ts).total_seconds() / 60.0)
+        dt_min = max(1.0, (ts - prev_feature.ts).total_seconds() / 60.0)
         pred = forecast_mold_index(mold_idx, prev_feature.idx_mold_now, dt_min, settings.forecast_horizon_minutes)
     else:
         pred = mold_idx
 
     feature = models.Feature(
-        ts=payload.ts,
+        ts=ts,
         air_node_id=payload.air_node_id,
         water_node_id=payload.water_node_id,
         qc_flags_json=json.dumps(qc_flags),
@@ -152,8 +175,8 @@ def ingest_telemetry(payload: schemas.TelemetryIn, db: Session = Depends(get_db)
     db.add(feature)
 
     pred_row = models.Prediction(
-        ts=payload.ts,
-        ts_target=payload.ts + timedelta(minutes=settings.forecast_horizon_minutes),
+        ts=ts,
+        ts_target=ts + timedelta(minutes=settings.forecast_horizon_minutes),
         air_node_id=payload.air_node_id,
         horizon_min=settings.forecast_horizon_minutes,
         pred_idx_mold_h=pred,
@@ -172,7 +195,7 @@ def ingest_telemetry(payload: schemas.TelemetryIn, db: Session = Depends(get_db)
         if all(p.pred_idx_mold_h > settings.alert_threshold for p in recent_preds):
             reason_codes = ["PRED_MOLD_THRESHOLD", f"CONSEC_{settings.alert_consecutive}"]
             alert = models.Alert(
-                ts=payload.ts,
+                ts=ts,
                 air_node_id=payload.air_node_id,
                 severity="MEDIUM",
                 message="Predicted mold risk sustained above threshold",
@@ -180,6 +203,7 @@ def ingest_telemetry(payload: schemas.TelemetryIn, db: Session = Depends(get_db)
             )
             db.add(alert)
 
+    _apply_retention(db)
     db.commit()
 
     return schemas.TelemetryOut(
