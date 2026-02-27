@@ -3,3 +3,4 @@ numpy==1.26.4
 scikit-learn==1.4.0
 lightgbm==4.2.0
 matplotlib==3.8.2
+plotext==5.0.1

@@ -66,40 +66,32 @@ def run_console(db_path: str, interval: float):
 
 def run_plot(db_path: str, interval: float, limit: int):
     try:
-        import matplotlib
-        matplotlib.use("TkAgg")
-        import matplotlib.pyplot as plt
-    except Exception as exc:  # pragma: no cover
-        raise SystemExit("matplotlib/TkAgg not available; pip install -r requirements-ml.txt") from exc
+        import plotext as plt
+    except ImportError as exc:  # pragma: no cover
+        raise SystemExit("plotext is not installed; pip install -r requirements-ml.txt") from exc
 
-    plt.ion()
-    fig, ax = plt.subplots(figsize=(10, 4))
-    line_rh, = ax.plot([], [], label="air_rh_pct")
-    line_mold, = ax.plot([], [], label="idx_mold_now")
-    line_pred, = ax.plot([], [], label="pred_idx_mold_h")
-    ax.set_ylim(0, 100)
-    ax.set_title("Live Mold Monitoring")
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Value")
-    ax.legend()
+    plt.clear_figure()
+    plt.title("Live Mold Monitoring")
+    plt.xlabel("Time")
+    plt.ylabel("Values")
+    plt.legend(["RH", "Mold idx", "Pred idx"])
+    plt.xlim(0, limit)
 
     while True:
         rows = fetch_series(db_path, limit=limit)
         if rows:
-            ts = [datetime.fromisoformat(r["ts"]) for r in rows]
             rh = [r["air_rh_pct"] or 0.0 for r in rows]
             mold = [r["idx_mold_now"] or 0.0 for r in rows]
             pred = [r["pred_idx_mold_h"] or 0.0 for r in rows]
+            timestamps = [datetime.fromisoformat(r["ts"]).strftime("%H:%M:%S") for r in rows]
 
-            line_rh.set_data(ts, rh)
-            line_mold.set_data(ts, mold)
-            line_pred.set_data(ts, pred)
-            ax.set_xlim(ts[0], ts[-1])
-            ax.relim()
-            ax.autoscale_view()
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        plt.pause(0.001)
+            plt.clt()
+            plt.cld()
+            plt.plot(timestamps, rh)
+            plt.plot(timestamps, mold)
+            plt.plot(timestamps, pred)
+            plt.plotsize(100, 30)
+            plt.show()
         time.sleep(interval)
 
 
