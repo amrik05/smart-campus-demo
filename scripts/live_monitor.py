@@ -82,13 +82,13 @@ def run_plot(db_path: str, interval: float, limit: int):
             rh = [r["air_rh_pct"] or 0.0 for r in rows]
             mold = [r["idx_mold_now"] or 0.0 for r in rows]
             pred = [r["pred_idx_mold_h"] or 0.0 for r in rows]
-            timestamps = [datetime.fromisoformat(r["ts"]).strftime("%H:%M:%S") for r in rows]
+            x = list(range(len(rows)))
 
             plt.clt()
             plt.cld()
-            plt.plot(timestamps, rh)
-            plt.plot(timestamps, mold)
-            plt.plot(timestamps, pred)
+            plt.plot(x, rh)
+            plt.plot(x, mold)
+            plt.plot(x, pred)
             plt.plotsize(100, 30)
             plt.show()
         time.sleep(interval)
