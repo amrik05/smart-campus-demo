@@ -74,7 +74,6 @@ def run_plot(db_path: str, interval: float, limit: int):
     plt.title("Live Mold Monitoring")
     plt.xlabel("Time")
     plt.ylabel("Values")
-    plt.legend(["RH", "Mold idx", "Pred idx"])
     plt.xlim(0, limit)
 
     while True:
