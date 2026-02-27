@@ -14,6 +14,10 @@ st.set_page_config(page_title="Smart Campus Demo", layout="wide")
 
 st.title("Smart Campus Demo Dashboard")
 
+st.sidebar.header("Refresh")
+auto_refresh = st.sidebar.checkbox("Auto-refresh", value=True)
+refresh_sec = st.sidebar.slider("Refresh interval (sec)", 1, 10, 2)
+
 tab_live, tab_ml = st.tabs(["Live Pipeline", "ML Demo"])
 
 with tab_live:
@@ -130,6 +134,14 @@ with tab_ml:
     if st.session_state.demo_running:
         time.sleep(1.0 / max(1, speed))
         _rerun()
+
+# Global auto-refresh for live streaming
+if auto_refresh:
+    time.sleep(float(refresh_sec))
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
 
     scenario_df = df[df["scenario"] == scenario].sort_values("ts").reset_index(drop=True)
     if scenario_df.empty:
