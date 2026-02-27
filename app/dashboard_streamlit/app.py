@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -120,8 +121,15 @@ with tab_ml:
         if st.button("Reset"):
             st.session_state.demo_idx = 0
 
+    def _rerun() -> None:
+        if hasattr(st, "rerun"):
+            st.rerun()
+        else:
+            st.experimental_rerun()
+
     if st.session_state.demo_running:
-        st.autorefresh(interval=int(1000 / max(1, speed)), key="ml_demo_tick")
+        time.sleep(1.0 / max(1, speed))
+        _rerun()
 
     scenario_df = df[df["scenario"] == scenario].sort_values("ts").reset_index(drop=True)
     if scenario_df.empty:
