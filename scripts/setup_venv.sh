@@ -12,7 +12,7 @@ source "$VENV_DIR/bin/activate"
 
 python -m pip install --upgrade pip
 
-# Install API + dashboard deps for local dev
-pip install -r requirements-api.txt -r requirements-dashboard.txt
+# Install all deps via aggregated requirements file
+pip install -r requirements.txt
 
 echo "Venv ready. Activate with: source .venv/bin/activate"

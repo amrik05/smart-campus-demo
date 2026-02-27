@@ -50,8 +50,8 @@ source .venv/bin/activate
 ## ML Demo (Mold Model)
 
 ```bash
-# Install ML deps in venv
-pip install -r requirements-ml.txt
+# Install all demo deps in venv
+pip install -r requirements.txt
 
 # Train + evaluate
 ./scripts/train_mold_demo.sh
