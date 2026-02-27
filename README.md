@@ -56,3 +56,15 @@ pip install -r requirements-ml.txt
 # Train + evaluate
 ./scripts/train_mold_demo.sh
 ```
+
+Outputs:
+- `data/mold_dataset.csv`
+- `models/mold_lgbm.txt`
+- `data/mold_eval.csv`
+- `data/mold_metrics.json`
+- `data/plots/mold_scatter.png`
+- `data/plots/mold_timeline.png`
+
+## ML Demo Details
+
+See `docs/ml_demo.md` for dataset generation, imputation, and metrics.

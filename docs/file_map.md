@@ -73,3 +73,12 @@ Streamlit dashboard.
 Integration notes:
 - Reads same SQLite DB as ingest via `DATABASE_URL` env.
 - Uses simple SQL queries to show latest telemetry, indices, forecasts, alerts.
+
+## ML Demo
+- `docs/ml_demo.md`: ML training flow, imputation, and metrics.
+- `requirements-ml.txt`: ML dependencies (LightGBM, sklearn, matplotlib).
+- `analytics/etl/build_mold_dataset.py`: Synthetic dataset + ETL + imputation.
+- `analytics/forecasting/train_mold_lgbm.py`: LightGBM training script.
+- `analytics/forecasting/eval_mold_demo.py`: Metrics + eval export.
+- `analytics/evaluation/mold_demo_plots.py`: Scatter + timeline plots.
+- `scripts/train_mold_demo.sh`: End-to-end ML demo pipeline.

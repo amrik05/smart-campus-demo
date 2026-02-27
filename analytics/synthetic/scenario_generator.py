@@ -9,6 +9,14 @@ import requests
 from .demo_clock import DemoClock, utc_now_floor
 
 
+def _quantize(value: float, step: float) -> float:
+    return round(value / step) * step
+
+
+def _clip(value: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, value))
+
+
 def build_payload(
     ts: datetime,
     scenario: str,
@@ -17,8 +25,8 @@ def build_payload(
 ) -> Dict[str, object]:
     rng = random.Random(seed + step)
 
-    air_temp = 22.0 + rng.uniform(-0.4, 0.4)
-    air_rh = 45.0 + rng.uniform(-3.0, 3.0)
+    air_temp = 22.0 + rng.uniform(-0.3, 0.3)
+    air_rh = 45.0 + rng.uniform(-2.0, 2.0)
     water_temp = 18.5 + rng.uniform(-0.2, 0.2)
     turb = 0.8 + rng.uniform(-0.1, 0.1)
     chlorine = 1.2 + rng.uniform(-0.1, 0.1)
@@ -27,8 +35,8 @@ def build_payload(
     pressure = 280.0 + rng.uniform(-5.0, 5.0)
 
     if scenario == "MOLD_EPISODE":
-        air_rh = min(95.0, 75.0 + 0.5 * step + rng.uniform(-2.0, 2.0))
-        air_temp = 23.0 + rng.uniform(-0.3, 0.3)
+        air_rh = min(95.0, 70.0 + 0.4 * step + rng.uniform(-1.5, 1.5))
+        air_temp = 23.0 + rng.uniform(-0.2, 0.2)
     elif scenario == "WATER_EVENT":
         turb = 5.0 + 1.2 * step + rng.uniform(-2.0, 2.0)
         chlorine = max(0.1, 0.6 - 0.02 * step + rng.uniform(-0.05, 0.05))
@@ -38,26 +46,42 @@ def build_payload(
         turb = 0.0
         chlorine = 0.0
 
+    # Quantize and clip to mimic cheap sensors
+    air_temp = _clip(_quantize(air_temp, 0.1), 15.0, 30.0)
+    air_rh = _clip(_quantize(air_rh, 0.1), 20.0, 98.0)
+    water_temp = _clip(_quantize(water_temp, 0.1), 5.0, 30.0)
+    turb = _clip(_quantize(turb, 0.1), 0.0, 1000.0)
+    chlorine = _clip(_quantize(chlorine, 0.01), 0.0, 5.0)
+    ph = _clip(_quantize(ph, 0.01), 0.0, 14.0)
+    cond = _clip(_quantize(cond, 1.0), 0.0, 5000.0)
+    pressure = _clip(_quantize(pressure, 0.1), 0.0, 1000.0)
+
+    air_co2 = _clip(_quantize(620.0 + rng.uniform(-40.0, 40.0), 1.0), 400.0, 2000.0)
+    air_pm25 = _clip(_quantize(8.0 + rng.uniform(-3.0, 3.0), 1.0), 0.0, 150.0)
+    air_tvoc = _clip(_quantize(150.0 + rng.uniform(-30.0, 30.0), 1.0), 0.0, 2000.0)
+    air_surface_temp = _quantize(air_temp - 0.6 + rng.uniform(-0.1, 0.1), 0.1)
+    air_material_moisture = _clip(_quantize(0.08 + (air_rh - 45.0) / 500.0, 0.01), 0.01, 0.6)
+
     payload = {
         "ts": ts.isoformat().replace("+00:00", "Z"),
         "building_id": "RUTGERS-ENG-1",
         "air_node_id": "AIR-001",
         "water_node_id": "WATER-001",
-        "air_temp_c": round(air_temp, 2),
-        "air_rh_pct": round(air_rh, 2),
-        "water_temp_c": round(water_temp, 2),
-        "water_turbidity_ntu": round(turb, 2),
-        "water_free_chlorine_mgL": round(chlorine, 3),
-        "water_ph": round(ph, 2),
-        "water_conductivity_uScm": round(cond, 2),
-        "water_pressure_kpa": round(pressure, 2),
+        "air_temp_c": air_temp,
+        "air_rh_pct": air_rh,
+        "water_temp_c": water_temp,
+        "water_turbidity_ntu": turb,
+        "water_free_chlorine_mgL": chlorine,
+        "water_ph": ph,
+        "water_conductivity_uScm": cond,
+        "water_pressure_kpa": pressure,
         "scenario": scenario,
         "data_source": "EMULATED",
-        "air_co2_ppm": 620.0 + rng.uniform(-30.0, 30.0),
-        "air_pm25_ugm3": 8.0 + rng.uniform(-2.0, 2.0),
-        "air_tvoc": 150.0 + rng.uniform(-20.0, 20.0),
-        "air_surface_temp_c": round(air_temp - 0.6, 2),
-        "air_material_moisture": round(0.08 + (air_rh - 45.0) / 500.0, 3),
+        "air_co2_ppm": air_co2,
+        "air_pm25_ugm3": air_pm25,
+        "air_tvoc": air_tvoc,
+        "air_surface_temp_c": air_surface_temp,
+        "air_material_moisture": air_material_moisture,
     }
     return payload
 
