@@ -46,3 +46,13 @@ See `docs/file_map.md` for a detailed file-by-file description.
 ./scripts/setup_venv.sh
 source .venv/bin/activate
 ```
+
+## ML Demo (Mold Model)
+
+```bash
+# Install ML deps in venv
+pip install -r requirements-ml.txt
+
+# Train + evaluate
+./scripts/train_mold_demo.sh
+```
