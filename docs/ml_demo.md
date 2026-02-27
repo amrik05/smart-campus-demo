@@ -52,3 +52,14 @@ Outputs:
 - `data/mold_eval.csv`
 - `data/plots/mold_scatter.png`
 - `data/plots/mold_timeline.png`
+
+## Dashboard Demo
+- The Streamlit dashboard includes an 'ML Demo' tab.
+- It replays a trained model's predictions from `data/mold_eval.csv`.
+- Controls: scenario selection, playback speed, window size, threshold.
+- Metrics: MAE + threshold accuracy + lead time.
+
+Generate demo data with:
+```bash
+./scripts/train_mold_demo.sh
+```

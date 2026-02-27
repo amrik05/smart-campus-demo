@@ -68,3 +68,5 @@ Outputs:
 ## ML Demo Details
 
 See `docs/ml_demo.md` for dataset generation, imputation, and metrics.
+
+ML demo tab is available in Streamlit after running the ML demo script.
