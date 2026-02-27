@@ -93,8 +93,11 @@ def run_plot(db_path: str, interval: float, limit: int):
             line_mold.set_data(ts, mold)
             line_pred.set_data(ts, pred)
             ax.set_xlim(ts[0], ts[-1])
+            ax.relim()
+            ax.autoscale_view()
         fig.canvas.draw()
         fig.canvas.flush_events()
+        plt.pause(0.001)
         time.sleep(interval)
 
 
