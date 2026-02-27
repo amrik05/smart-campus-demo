@@ -2,8 +2,12 @@ import argparse
 import sqlite3
 import time
 from datetime import datetime
-import tkinter as tk
-from tkinter import ttk
+try:
+    import tkinter as tk
+    from tkinter import ttk
+except Exception:  # pragma: no cover
+    tk = None
+    ttk = None
 
 
 def fetch_latest(conn):
@@ -33,6 +37,12 @@ def main():
     args = parser.parse_args()
 
     conn = sqlite3.connect(args.db)
+
+    if tk is None or ttk is None:
+        print("Tkinter not available. Install python3-tk or use console monitor:")
+        print("  sudo apt-get install python3-tk")
+        print("  python scripts/live_monitor.py --mode console --interval 2")
+        return
 
     root = tk.Tk()
     root.title("Smart Campus Demo Monitor")
