@@ -66,9 +66,11 @@ def run_console(db_path: str, interval: float):
 
 def run_plot(db_path: str, interval: float, limit: int):
     try:
+        import matplotlib
+        matplotlib.use("TkAgg")
         import matplotlib.pyplot as plt
     except Exception as exc:  # pragma: no cover
-        raise SystemExit("matplotlib not installed. pip install -r requirements-ml.txt") from exc
+        raise SystemExit("matplotlib/TkAgg not available; pip install -r requirements-ml.txt") from exc
 
     plt.ion()
     fig, ax = plt.subplots(figsize=(10, 4))
