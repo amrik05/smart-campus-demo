@@ -149,7 +149,10 @@ if auto_refresh:
         st.stop()
 
     # Advance pointer
-    st.session_state.demo_idx = min(st.session_state.demo_idx + (1 if st.session_state.demo_running else 0), len(scenario_df) - 1)
+    st.session_state.demo_idx = min(
+        st.session_state.demo_idx + (1 if st.session_state.demo_running else 0),
+        len(scenario_df) - 1,
+    )
 
     current_ts = scenario_df.loc[st.session_state.demo_idx, "ts"]
     window_start = current_ts - timedelta(minutes=window_minutes)
@@ -169,11 +172,17 @@ if auto_refresh:
         lead_min = 0.0
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Latest Predicted Risk", f"{latest_pred:.2f}")
-    c2.metric("Latest Actual Risk", f"{latest_actual:.2f}")
+    c1.metric("Latest Predicted Risk", f"{latest_pred:.3f}")
+    c2.metric("Latest Actual Risk", f"{latest_actual:.3f}")
     c3.metric("Lead Time (min)", f"{lead_min:.1f}")
 
     st.divider()
+
+    st.caption(
+        f"Playback index: {st.session_state.demo_idx + 1}/{len(scenario_df)} | Current time: {current_ts}"
+    )
+    if scenario == "NORMAL":
+        st.info("NORMAL scenario stays near zero risk. Switch to MOLD_EPISODE to see rising risk.")
 
     chart_df = window_df.set_index("ts")[["target_idx_mold_h", "pred_idx_mold_h"]]
     st.line_chart(chart_df)
