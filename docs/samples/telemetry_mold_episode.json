@@ -1,0 +1,21 @@
+{
+  "ts": "2026-02-27T12:30:00Z",
+  "building_id": "RUTGERS-ENG-1",
+  "air_node_id": "AIR-001",
+  "water_node_id": "WATER-001",
+  "air_temp_c": 23.0,
+  "air_rh_pct": 82.0,
+  "water_temp_c": 19.0,
+  "water_turbidity_ntu": 0.9,
+  "water_free_chlorine_mgL": 1.1,
+  "water_ph": 7.2,
+  "water_conductivity_uScm": 340.0,
+  "water_pressure_kpa": 285.0,
+  "scenario": "MOLD_EPISODE",
+  "data_source": "EMULATED",
+  "air_co2_ppm": 700.0,
+  "air_pm25_ugm3": 12.0,
+  "air_tvoc": 220.0,
+  "air_surface_temp_c": 22.4,
+  "air_material_moisture": 0.18
+}

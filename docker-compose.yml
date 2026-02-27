@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  ingest_api:
+    build:
+      context: .
+      dockerfile: cloud/ingest_api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////data/smart_campus.db
+    volumes:
+      - ./data:/data
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: app/dashboard_streamlit/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - DATABASE_URL=sqlite:////data/smart_campus.db
+    volumes:
+      - ./data:/data
+    depends_on:
+      - ingest_api
