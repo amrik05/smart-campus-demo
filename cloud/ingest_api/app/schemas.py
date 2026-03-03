@@ -26,7 +26,10 @@ class TelemetryIn(BaseModel):
     air_rh_pct: float
     air_surface_temp_c: Optional[float] = None
     air_co2_ppm: Optional[float] = None
+    air_pm25_ugm3: Optional[float] = None
+    air_tvoc: Optional[float] = None
     air_voc_index: Optional[float] = None
+    air_material_moisture: Optional[float] = None
 
     water_turbidity_ntu: float
     water_tds_ppm: float
@@ -51,6 +54,55 @@ class TelemetryIn(BaseModel):
     tod_cos: Optional[float] = None
     dow_sin: Optional[float] = None
     dow_cos: Optional[float] = None
+
+
+class AirTelemetryIn(BaseModel):
+    ts: datetime
+    building_id: str
+    air_node_id: str
+    water_node_id: Optional[str] = "WATER-UNKNOWN"
+
+    air_temp_c: float
+    air_rh_pct: float
+    air_surface_temp_c: Optional[float] = None
+    air_co2_ppm: Optional[float] = None
+    air_pm25_ugm3: Optional[float] = None
+    air_tvoc: Optional[float] = None
+    air_voc_index: Optional[float] = None
+    air_voc_raw: Optional[int] = None
+    air_material_moisture: Optional[float] = None
+
+    scenario: ScenarioEnum = ScenarioEnum.NORMAL
+    episode_id: Optional[str] = None
+    data_source: DataSourceEnum = DataSourceEnum.LIVE
+
+    rssi_ble: Optional[int] = None
+    battery_mv: Optional[int] = None
+    flags: Optional[int] = None
+
+    site_id: Optional[str] = None
+    building_zone: Optional[str] = None
+    outdoor_temp_c: Optional[float] = None
+    outdoor_rh_pct: Optional[float] = None
+    outdoor_dew_point_c: Optional[float] = None
+    tod_sin: Optional[float] = None
+    tod_cos: Optional[float] = None
+    dow_sin: Optional[float] = None
+    dow_cos: Optional[float] = None
+
+
+class AirSensorRawIn(BaseModel):
+    air_temp_c: float
+    air_rh_pct: float
+    air_voc_raw: int
+
+
+class WaterSensorRawIn(BaseModel):
+    surface_temp_c: float
+    turbidity_raw: int
+    tds_raw: int
+    turbidity_v: float
+    tds_v: float
 
 
 class NormalizedOut(BaseModel):
@@ -80,7 +132,10 @@ class NormalizedOut(BaseModel):
     air_rh_pct: float
     air_surface_temp_c: float
     air_co2_ppm: Optional[float]
+    air_pm25_ugm3: Optional[float]
+    air_tvoc: Optional[float]
     air_voc_index: Optional[float]
+    air_material_moisture: Optional[float]
 
     water_turbidity_ntu: float
     water_tds_ppm: float
