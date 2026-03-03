@@ -1,213 +1,59 @@
-import json
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Tuple
+from datetime import timedelta
+from typing import Dict, List
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Query
 
-from analytics.forecasting.baseline import forecast_mold_index
-from analytics.indices.mold_index import mold_risk_index
-from analytics.indices.water_index import water_event_index
-from analytics.indices.physics import clamp
+from . import schemas
+import os
 
-from . import models, schemas
-from .db import SessionLocal
-from .settings import settings
+from .pipeline import AlertConfig, ForecastConfig, run_pipeline
+from .state import GlobalState
 
 router = APIRouter()
+state = GlobalState()
+
+forecast_cfg = ForecastConfig(
+    horizon_min=int(os.getenv("FORECAST_HORIZON_MIN", "30")),
+    model_mode=os.getenv("MODEL_MODE", "baseline"),
+)
+alert_cfg = AlertConfig(threshold=0.8, hysteresis=0.05, persistence_n=3, interval_s=10)
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+@router.post("/telemetry", response_model=schemas.IngestResponse)
+def ingest_telemetry(payload: schemas.TelemetryIn):
+    result = run_pipeline(payload.dict(), state, forecast_cfg, alert_cfg)
+    return result
 
 
-def _qc_flags(
-    payload: schemas.TelemetryIn,
-    history: List[models.RawTelemetry],
-) -> Tuple[Dict[str, Dict[str, bool]], float]:
-    flags = {"range": {}, "missing": {}, "flatline": {}}
-    score = 1.0
-
-    required_fields = [
-        "air_temp_c",
-        "air_rh_pct",
-        "water_temp_c",
-        "water_turbidity_ntu",
-        "water_free_chlorine_mgL",
-        "water_ph",
-        "water_conductivity_uScm",
-        "water_pressure_kpa",
-    ]
-
-    for field in required_fields:
-        value = getattr(payload, field)
-        flags["missing"][field] = value is None
-        if value is None:
-            score -= 0.1
-            continue
-        lo, hi = settings.qc_ranges[field]
-        out_of_range = value < lo or value > hi
-        flags["range"][field] = out_of_range
-        if out_of_range:
-            score -= 0.1
-
-    window = settings.flatline_window
-    if history and window > 2:
-        recent = history[-(window - 1) :]
-        for field in required_fields:
-            values = [getattr(r, field) for r in recent] + [getattr(payload, field)]
-            is_flat = max(values) - min(values) < 0.01
-            flags["flatline"][field] = is_flat
-            if is_flat:
-                score -= 0.05
-    else:
-        for field in required_fields:
-            flags["flatline"][field] = False
-
-    score = clamp(score, 0.0, 1.0)
-    return flags, score
+@router.get("/latest")
+def latest(air_node_id: str = ""):
+    if not state.latest_response:
+        return {"status": "empty"}
+    if air_node_id:
+        node_latest = state.get_latest_for_node(air_node_id)
+        return node_latest or {"status": "empty"}
+    return state.latest_response
 
 
-def _get_history(
-    db: Session,
-    air_node_id: str,
-    minutes: int,
-) -> List[models.RawTelemetry]:
-    # Get latest N minutes for the given air node
-    latest = (
-        db.query(models.RawTelemetry)
-        .filter(models.RawTelemetry.air_node_id == air_node_id)
-        .order_by(models.RawTelemetry.ts.desc())
-        .first()
-    )
-    if not latest:
-        return []
-    start_ts = latest.ts - timedelta(minutes=minutes)
-    rows = (
-        db.query(models.RawTelemetry)
-        .filter(models.RawTelemetry.air_node_id == air_node_id)
-        .filter(models.RawTelemetry.ts >= start_ts)
-        .order_by(models.RawTelemetry.ts.asc())
-        .all()
-    )
-    return rows
-
-
-def _extract_mold_history(rows: List[models.RawTelemetry]) -> List[Tuple[float, float]]:
-    return [(r.air_temp_c, r.air_rh_pct) for r in rows]
-
-
-def _extract_water_history(rows: List[models.RawTelemetry]) -> List[Tuple[float, float, float]]:
-    return [(r.water_turbidity_ntu, r.water_free_chlorine_mgL, r.water_conductivity_uScm) for r in rows]
-
-def _apply_retention(db: Session) -> None:
-    # Time-based retention
-    if settings.retention_days > 0:
-        cutoff = datetime.utcnow() - timedelta(days=settings.retention_days)
-        db.query(models.RawTelemetry).filter(models.RawTelemetry.ts < cutoff).delete()
-        db.query(models.Feature).filter(models.Feature.ts < cutoff).delete()
-        db.query(models.Prediction).filter(models.Prediction.ts < cutoff).delete()
-        db.query(models.Alert).filter(models.Alert.ts < cutoff).delete()
-
-    # Size-based retention (keep most recent N rows)
-    max_rows = settings.retention_max_rows
-    if max_rows > 0:
-        for model in (models.RawTelemetry, models.Feature, models.Prediction, models.Alert):
-            rows = db.query(model.id).order_by(model.id.desc()).offset(max_rows).all()
-            if rows:
-                cutoff_id = rows[-1][0]
-                db.query(model).filter(model.id <= cutoff_id).delete()
-
-
-@router.post("/telemetry", response_model=schemas.TelemetryOut)
-def ingest_telemetry(payload: schemas.TelemetryIn, db: Session = Depends(get_db)):
-    # Normalize to naive UTC for SQLite
-    ts = payload.ts
-    if ts.tzinfo is not None:
-        ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
-
-    raw = models.RawTelemetry(**payload.dict(exclude={"ts"}), ts=ts)
-    db.add(raw)
-    db.flush()
-
-    history_60 = _get_history(db, payload.air_node_id, 60)
-    history_120 = _get_history(db, payload.air_node_id, 120)
-
-    qc_flags, health_score = _qc_flags(payload, history_60)
-
-    mold_idx = mold_risk_index(
-        payload.air_temp_c,
-        payload.air_rh_pct,
-        _extract_mold_history(history_60),
-    )
-    water_idx = water_event_index(
-        payload.water_turbidity_ntu,
-        payload.water_free_chlorine_mgL,
-        payload.water_conductivity_uScm,
-        _extract_water_history(history_120),
-    )
-
-    prev_feature = (
-        db.query(models.Feature)
-        .filter(models.Feature.air_node_id == payload.air_node_id)
-        .order_by(models.Feature.ts.desc())
-        .first()
-    )
-    if prev_feature:
-        dt_min = max(1.0, (ts - prev_feature.ts).total_seconds() / 60.0)
-        pred = forecast_mold_index(mold_idx, prev_feature.idx_mold_now, dt_min, settings.forecast_horizon_minutes)
-    else:
-        pred = mold_idx
-
-    feature = models.Feature(
-        ts=ts,
-        air_node_id=payload.air_node_id,
-        water_node_id=payload.water_node_id,
-        qc_flags_json=json.dumps(qc_flags),
-        sensor_health_score=health_score,
-        idx_mold_now=mold_idx,
-        idx_water_event_now=water_idx,
-    )
-    db.add(feature)
-
-    pred_row = models.Prediction(
-        ts=ts,
-        ts_target=ts + timedelta(minutes=settings.forecast_horizon_minutes),
-        air_node_id=payload.air_node_id,
-        horizon_min=settings.forecast_horizon_minutes,
-        pred_idx_mold_h=pred,
-    )
-    db.add(pred_row)
-
-    # Alerting logic
-    recent_preds = (
-        db.query(models.Prediction)
-        .filter(models.Prediction.air_node_id == payload.air_node_id)
-        .order_by(models.Prediction.ts.desc())
-        .limit(settings.alert_consecutive)
-        .all()
-    )
-    if len(recent_preds) == settings.alert_consecutive:
-        if all(p.pred_idx_mold_h > settings.alert_threshold for p in recent_preds):
-            reason_codes = ["PRED_MOLD_THRESHOLD", f"CONSEC_{settings.alert_consecutive}"]
-            alert = models.Alert(
-                ts=ts,
-                air_node_id=payload.air_node_id,
-                severity="MEDIUM",
-                message="Predicted mold risk sustained above threshold",
-                reason_codes_json=json.dumps(reason_codes),
+@router.get("/history")
+def history(
+    air_node_id: str = Query(default="air_01"),
+    minutes: int = Query(default=30, ge=1, le=360),
+):
+    if not state.history:
+        return {"rows": []}
+    latest_ts = state.history[-1]["normalized"]["ts"]
+    cutoff = latest_ts - timedelta(minutes=minutes)
+    rows: List[Dict[str, object]] = []
+    for item in list(state.history):
+        ts = item["normalized"]["ts"]
+        if ts >= cutoff and item["normalized"]["air_node_id"] == air_node_id:
+            rows.append(
+                {
+                    "ts": ts,
+                    "air_rh_pct": item["normalized"]["air_rh_pct"],
+                    "idx_mold_now": item["features"]["idx_mold_now"],
+                    "pred_idx_mold_h": item["prediction"]["yhat"],
+                }
             )
-            db.add(alert)
-
-    _apply_retention(db)
-    db.commit()
-
-    return schemas.TelemetryOut(
-        idx_mold_now=mold_idx,
-        pred_idx_mold_h=pred,
-        idx_water_event_now=water_idx,
-    )
+    return {"rows": rows}

@@ -5,10 +5,10 @@
 
 // Required fields
 // ts, building_id, air_node_id, water_node_id
-// air_temp_c, air_rh_pct
-// water_temp_c, water_turbidity_ntu, water_free_chlorine_mgL
-// water_ph, water_conductivity_uScm, water_pressure_kpa
-// scenario, data_source
+// air_temp_c, air_rh_pct, air_surface_temp_c, air_co2_ppm, air_voc_index
+// water_temp_c, water_turbidity_ntu, water_tds_ppm, water_free_chlorine_mgL
+// scenario, episode_id, data_source
+// seq_water, rssi_ble, battery_mv, flags (optional)
 
 // Optional fields
-// air_co2_ppm, air_pm25_ugm3, air_tvoc, air_surface_temp_c, air_material_moisture
+// air_co2_ppm, air_voc_index, air_surface_temp_c

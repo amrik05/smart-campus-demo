@@ -8,7 +8,7 @@ python -m analytics.etl.build_mold_dataset \
   --horizon-min 60 \
   --window-min 60 \
   --episodes-per-scenario 3 \
-  --missing-rate 0.02
+  --missing-rate 0.0
 
 # Train model
 python -m analytics.forecasting.train_mold_lgbm \

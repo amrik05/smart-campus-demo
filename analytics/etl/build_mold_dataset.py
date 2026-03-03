@@ -43,12 +43,16 @@ def _sensor_profiles(
     air_tvoc = 150.0 + rng.normal(0.0, 20.0, steps)
     air_surface_temp = air_temp - 0.6 + rng.normal(0.0, 0.1, steps)
     air_material_moisture = 0.08 + rng.normal(0.0, 0.01, steps)
+    outdoor_temp = 10.0 + 5.0 * np.sin(np.arange(steps) / 30.0) + rng.normal(0.0, 0.5, steps)
+    outdoor_rh = 65.0 + 10.0 * np.cos(np.arange(steps) / 40.0) + rng.normal(0.0, 1.5, steps)
 
     if scenario == "MOLD_EPISODE":
-        ramp = np.linspace(0, 1, steps)
-        air_rh = 70.0 + 25.0 * ramp + rng.normal(0.0, 1.2, steps)
+        # Delayed ramp + plateau to create predictive lead at horizon
+        t = np.arange(steps)
+        ramp = np.clip((t - steps * 0.2) / (steps * 0.6), 0.0, 1.0)
+        air_rh = 65.0 + 30.0 * ramp + rng.normal(0.0, 0.8, steps)
         air_temp = 23.0 + rng.normal(0.0, 0.2, steps)
-        air_surface_temp = air_temp - 0.8 + rng.normal(0.0, 0.1, steps)
+        air_surface_temp = air_temp - (0.7 + 0.3 * ramp) + rng.normal(0.0, 0.08, steps)
         air_material_moisture = 0.10 + 0.10 * ramp + rng.normal(0.0, 0.01, steps)
 
     # Quantize to mimic low-cost sensors
@@ -59,6 +63,8 @@ def _sensor_profiles(
     air_tvoc = _quantize(air_tvoc, 1.0)
     air_surface_temp = _quantize(air_surface_temp, 0.1)
     air_material_moisture = _quantize(air_material_moisture, 0.01)
+    outdoor_temp = _quantize(outdoor_temp, 0.1)
+    outdoor_rh = _quantize(outdoor_rh, 0.1)
 
     # Clip to plausible ranges
     air_temp = _clip(air_temp, 15.0, 30.0)
@@ -67,6 +73,7 @@ def _sensor_profiles(
     air_pm25 = _clip(air_pm25, 0.0, 150.0)
     air_tvoc = _clip(air_tvoc, 0.0, 2000.0)
     air_material_moisture = _clip(air_material_moisture, 0.01, 0.6)
+    outdoor_rh = _clip(outdoor_rh, 20.0, 100.0)
 
     return {
         "air_temp_c": air_temp,
@@ -76,6 +83,8 @@ def _sensor_profiles(
         "air_tvoc": air_tvoc,
         "air_surface_temp_c": air_surface_temp,
         "air_material_moisture": air_material_moisture,
+        "outdoor_temp_c": outdoor_temp,
+        "outdoor_rh_pct": outdoor_rh,
     }
 
 
@@ -92,6 +101,12 @@ def _build_episode(cfg: EpisodeConfig, freq_min: int = 1) -> pd.DataFrame:
     df = pd.DataFrame({"ts": ts, **sensors})
 
     df["dew_point_c"] = df.apply(lambda r: dew_point_c(r["air_temp_c"], r["air_rh_pct"]), axis=1)
+    df["dew_margin_c"] = df["air_surface_temp_c"] - df["dew_point_c"]
+    df["outdoor_dew_point_c"] = df["outdoor_temp_c"] - (100.0 - df["outdoor_rh_pct"]) / 5.0
+    df["tod_sin"] = np.sin(2.0 * np.pi * df["ts"].dt.hour * 60.0 / (24 * 60))
+    df["tod_cos"] = np.cos(2.0 * np.pi * df["ts"].dt.hour * 60.0 / (24 * 60))
+    df["dow_sin"] = np.sin(2.0 * np.pi * df["ts"].dt.weekday / 7.0)
+    df["dow_cos"] = np.cos(2.0 * np.pi * df["ts"].dt.weekday / 7.0)
     return df
 
 
@@ -109,9 +124,17 @@ def _build_features(df: pd.DataFrame, window: int) -> pd.DataFrame:
     feats = pd.DataFrame(index=df.index)
     # Keep only engineered features here to avoid duplicate columns
     feats["rh_mean_w"] = df["air_rh_pct"].rolling(window).mean()
+    feats["rh_std_w"] = df["air_rh_pct"].rolling(window).std()
     feats["rh_slope_w"] = df["air_rh_pct"].diff(window)
     feats["temp_slope_w"] = df["air_temp_c"].diff(window)
     feats["dew_point_slope_w"] = df["dew_point_c"].diff(window)
+    feats["dew_margin_slope_w"] = df["dew_margin_c"].diff(window)
+    feats["rh_time_above_70_w"] = (df["air_rh_pct"] >= 70.0).rolling(window).mean()
+    feats["dew_margin_time_below_0_w"] = (df["dew_margin_c"] <= 0.0).rolling(window).mean()
+    feats["air_rh_pct_t_minus_1"] = df["air_rh_pct"].shift(1)
+    feats["air_rh_pct_t_minus_5"] = df["air_rh_pct"].shift(5)
+    feats["dew_margin_c_t_minus_5"] = df["dew_margin_c"].shift(5)
+    feats["idx_mold_now_t_minus_5"] = df["idx_mold_now"].shift(5)
     return feats
 
 

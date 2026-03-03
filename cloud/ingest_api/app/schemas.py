@@ -1,15 +1,14 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ScenarioEnum(str, Enum):
     NORMAL = "NORMAL"
     MOLD_EPISODE = "MOLD_EPISODE"
     WATER_EVENT = "WATER_EVENT"
-    SENSOR_FAULT = "SENSOR_FAULT"
 
 
 class DataSourceEnum(str, Enum):
@@ -25,25 +24,134 @@ class TelemetryIn(BaseModel):
 
     air_temp_c: float
     air_rh_pct: float
-    water_temp_c: float
+    air_surface_temp_c: Optional[float] = None
+    air_co2_ppm: Optional[float] = None
+    air_voc_index: Optional[float] = None
+
     water_turbidity_ntu: float
+    water_tds_ppm: float
+    water_temp_c: float
     water_free_chlorine_mgL: float
-    water_ph: float
-    water_conductivity_uScm: float
-    water_pressure_kpa: float
 
     scenario: ScenarioEnum
+    episode_id: Optional[str] = None
     data_source: DataSourceEnum
 
-    air_co2_ppm: Optional[float] = None
-    air_pm25_ugm3: Optional[float] = None
-    air_tvoc: Optional[float] = None
-    air_surface_temp_c: Optional[float] = None
-    air_material_moisture: Optional[float] = None
+    seq_water: Optional[int] = None
+    rssi_ble: Optional[int] = None
+    battery_mv: Optional[int] = None
+    flags: Optional[int] = None
+
+    site_id: Optional[str] = None
+    building_zone: Optional[str] = None
+    outdoor_temp_c: Optional[float] = None
+    outdoor_rh_pct: Optional[float] = None
+    outdoor_dew_point_c: Optional[float] = None
+    tod_sin: Optional[float] = None
+    tod_cos: Optional[float] = None
+    dow_sin: Optional[float] = None
+    dow_cos: Optional[float] = None
 
 
-class TelemetryOut(BaseModel):
-    status: str = Field(default="ok")
+class NormalizedOut(BaseModel):
+    ts: datetime
+    ingest_ts: datetime
+    building_id: str
+    air_node_id: str
+    water_node_id: str
+    scenario: ScenarioEnum
+    episode_id: Optional[str]
+    data_source: DataSourceEnum
+    seq_water: Optional[int]
+    rssi_ble: Optional[int]
+    battery_mv: Optional[int]
+    flags: Optional[int]
+    site_id: Optional[str]
+    building_zone: Optional[str]
+    outdoor_temp_c: Optional[float]
+    outdoor_rh_pct: Optional[float]
+    outdoor_dew_point_c: Optional[float]
+    tod_sin: Optional[float]
+    tod_cos: Optional[float]
+    dow_sin: Optional[float]
+    dow_cos: Optional[float]
+
+    air_temp_c: float
+    air_rh_pct: float
+    air_surface_temp_c: float
+    air_co2_ppm: Optional[float]
+    air_voc_index: Optional[float]
+
+    water_turbidity_ntu: float
+    water_tds_ppm: float
+    water_temp_c: float
+    water_free_chlorine_mgL: float
+
+
+class FeaturesOut(BaseModel):
+    dew_point_c: float
+    dew_margin_c: float
+    window_s: float
+    rh_mean_w: float
+    rh_std_w: float
+    rh_slope_w: float
+    temp_slope_w: float
+    dew_point_slope_w: float
+    dew_margin_slope_w: float
+    rh_time_above_70_w: float
+    dew_margin_time_below_0_w: float
+    air_rh_pct_t_minus_1: float
+    air_rh_pct_t_minus_5: float
+    dew_margin_c_t_minus_5: float
+    idx_mold_now_t_minus_5: float
     idx_mold_now: float
-    pred_idx_mold_h: float
     idx_water_event_now: float
+
+
+class PredictionOut(BaseModel):
+    target: str
+    horizon_min: int
+    yhat: float
+    model_name: str
+    model_version: str
+
+
+class AlertOut(BaseModel):
+    status: str
+    target: str
+    threshold: float
+    horizon_min: int
+    persistence_n: int
+    created_ts: datetime
+    episode_id: Optional[str]
+    message: str
+
+
+class HealthOut(BaseModel):
+    score: float
+    warnings: Dict[str, str]
+    data_trust_level: str
+
+
+class AlertStateOut(BaseModel):
+    open: bool
+    threshold: float
+    persistence_n: int
+
+
+class EventTimesOut(BaseModel):
+    pred_cross_ts: Optional[datetime]
+    pred_resolve_ts: Optional[datetime]
+    actual_cross_ts: Optional[datetime]
+    actual_resolve_ts: Optional[datetime]
+
+
+class IngestResponse(BaseModel):
+    normalized: NormalizedOut
+    features: FeaturesOut
+    prediction: PredictionOut
+    health: HealthOut
+    alert_state: AlertStateOut
+    event_times: EventTimesOut
+    alert: Optional[AlertOut]
+    warnings: Dict[str, str]

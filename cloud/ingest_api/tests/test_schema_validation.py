@@ -1,6 +1,6 @@
 import pytest
 
-from app.schemas import TelemetryIn
+from cloud.ingest_api.app.schemas import TelemetryIn
 
 
 def test_valid_payload():
@@ -14,9 +14,7 @@ def test_valid_payload():
         "water_temp_c": 18.5,
         "water_turbidity_ntu": 0.8,
         "water_free_chlorine_mgL": 1.2,
-        "water_ph": 7.4,
-        "water_conductivity_uScm": 350.0,
-        "water_pressure_kpa": 280.0,
+        "water_tds_ppm": 350.0,
         "scenario": "NORMAL",
         "data_source": "EMULATED",
     }
@@ -35,9 +33,7 @@ def test_missing_field():
         "water_temp_c": 18.5,
         "water_turbidity_ntu": 0.8,
         "water_free_chlorine_mgL": 1.2,
-        "water_ph": 7.4,
-        "water_conductivity_uScm": 350.0,
-        "water_pressure_kpa": 280.0,
+        "water_tds_ppm": 350.0,
         "scenario": "NORMAL",
     }
     with pytest.raises(Exception):

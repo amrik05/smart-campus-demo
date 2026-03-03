@@ -1,194 +1,188 @@
 import os
 import time
-from datetime import datetime, timedelta
 
 import pandas as pd
-import sqlalchemy as sa
+import requests
 import streamlit as st
+import altair as alt
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/smart_campus.db")
-
-engine = sa.create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {})
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+ALERT_THRESHOLD = float(os.getenv("ALERT_THRESHOLD", "0.8"))
 
 st.set_page_config(page_title="Smart Campus Demo", layout="wide")
-
 st.title("Smart Campus Demo Dashboard")
 
 st.sidebar.header("Refresh")
 auto_refresh = st.sidebar.checkbox("Auto-refresh", value=True)
 refresh_sec = st.sidebar.slider("Refresh interval (sec)", 1, 10, 2)
 
-tab_live, tab_ml = st.tabs(["Live Pipeline", "ML Demo"])
 
-with tab_live:
-    col1, col2, col3 = st.columns(3)
+def fetch_latest(air_node_id: str = "") -> dict:
+    try:
+        url = f"{API_URL}/latest"
+        if air_node_id:
+            url = f"{API_URL}/latest?air_node_id={air_node_id}"
+        return requests.get(url, timeout=3).json()
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
 
-    with col1:
-        st.subheader("Latest Telemetry")
-        latest = pd.read_sql_query(
-            "SELECT * FROM raw_telemetry ORDER BY ts DESC LIMIT 1",
-            engine,
-        )
-        st.dataframe(latest, use_container_width=True)
 
-    with col2:
-        st.subheader("Latest Indices")
-        features = pd.read_sql_query(
-            "SELECT * FROM features ORDER BY ts DESC LIMIT 1",
-            engine,
-        )
-        st.dataframe(features, use_container_width=True)
+def fetch_history(air_node_id: str) -> dict:
+    try:
+        return requests.get(
+            f"{API_URL}/history?air_node_id={air_node_id}&minutes=60",
+            timeout=3,
+        ).json()
+    except Exception as exc:
+        return {"rows": [], "error": str(exc)}
 
-    with col3:
-        st.subheader("Latest Prediction")
-        preds = pd.read_sql_query(
-            "SELECT * FROM predictions ORDER BY ts DESC LIMIT 1",
-            engine,
-        )
-        st.dataframe(preds, use_container_width=True)
 
-    st.divider()
+latest = fetch_latest()
 
-    st.subheader("Mold Risk Over Time")
-    plot_df = pd.read_sql_query(
-        """
-        SELECT r.ts, r.air_rh_pct, f.idx_mold_now, p.pred_idx_mold_h
-        FROM raw_telemetry r
-        LEFT JOIN features f ON r.ts = f.ts
-        LEFT JOIN predictions p ON r.ts = p.ts
-        ORDER BY r.ts ASC
-        LIMIT 500
+def render_view(title: str, air_node_id: str) -> None:
+    st.subheader(title)
+    latest_local = fetch_latest(air_node_id)
+    if latest_local.get("status") == "empty":
+        st.info("No data yet for this stream.")
+        return
+    if latest_local.get("status") == "error":
+        st.error(f"API error: {latest_local.get('error')}")
+        return
+
+    alert_state = latest_local.get("alert_state") or {}
+    idx_now = latest_local["features"]["idx_mold_now"]
+    pred = latest_local["prediction"]["yhat"]
+    alert_open = alert_state.get("open") or idx_now >= ALERT_THRESHOLD or pred >= ALERT_THRESHOLD
+    banner_text = "ALERT OPEN: Predicted mold risk above threshold" if alert_open else "System nominal"
+    banner_color = "#B00020" if alert_open else "#0B6E4F"
+    st.markdown(
+        f"""
+        <div style="
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            padding: 10px 14px;
+            border-radius: 6px;
+            color: white;
+            background: {banner_color};
+            font-weight: 600;
+        ">
+            {banner_text}
+        </div>
         """,
-        engine,
+        unsafe_allow_html=True,
     )
 
-    if not plot_df.empty:
+    top_a, top_b, top_c, top_d, top_e = st.columns(5)
+    top_a.metric("RH %", f"{latest_local['normalized']['air_rh_pct']:.1f}")
+    top_b.metric("Dew Margin C", f"{latest_local['features']['dew_margin_c']:.2f}")
+    top_c.metric("Mold Risk Now", f"{idx_now:.3f}")
+    horizon = latest_local["prediction"]["horizon_min"]
+    top_d.metric(f"Predicted +{horizon}m", f"{pred:.3f}")
+    top_e.metric("Health Score", f"{latest_local['health']['score']:.2f}")
+
+    meta_a, meta_b, meta_c = st.columns(3)
+    meta_a.caption(f"Scenario: {latest_local['normalized']['scenario']}")
+    meta_b.caption(f"Model: {latest_local['prediction']['model_name']}")
+    meta_c.caption(f"Updated: {latest_local['normalized']['ts']}")
+
+    history = fetch_history(air_node_id)
+    plot_df = pd.DataFrame(history.get("rows", []))
+    st.markdown("**Live Trends**")
+    if plot_df.empty:
+        st.info("Waiting for data stream...")
+    else:
         plot_df["ts"] = pd.to_datetime(plot_df["ts"])
         plot_df = plot_df.set_index("ts")
-        st.line_chart(plot_df[["air_rh_pct", "idx_mold_now", "pred_idx_mold_h"]])
+        plot_df["threshold"] = ALERT_THRESHOLD
 
-    st.divider()
+        risk_df = plot_df.reset_index()[["ts", "idx_mold_now", "pred_idx_mold_h", "threshold"]]
+        risk_long = risk_df.melt("ts", var_name="series", value_name="value")
+        color_scale = alt.Scale(
+            domain=["idx_mold_now", "pred_idx_mold_h", "threshold"],
+            range=["#1f77b4", "#ff7f0e", "#d62728"],
+        )
+        risk_chart = (
+            alt.Chart(risk_long)
+            .mark_line()
+            .encode(
+                x="ts:T",
+                y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1])),
+                color=alt.Color("series:N", scale=color_scale),
+            )
+            .properties(height=280)
+        )
+        st.altair_chart(risk_chart, use_container_width=True)
 
-    st.subheader("Alerts Feed")
-    alerts = pd.read_sql_query(
-        "SELECT * FROM alerts ORDER BY ts DESC LIMIT 50",
-        engine,
-    )
-    st.dataframe(alerts, use_container_width=True)
+        rh_df = plot_df.reset_index()[["ts", "air_rh_pct"]]
+        rh_chart = (
+            alt.Chart(rh_df)
+            .mark_line(color="#2ca02c")
+            .encode(x="ts:T", y=alt.Y("air_rh_pct:Q", scale=alt.Scale(domain=[0, 100])))
+            .properties(height=200)
+        )
+        st.altair_chart(rh_chart, use_container_width=True)
 
-    st.divider()
+        if len(plot_df) >= 3:
+            tail = plot_df.tail(5)
+            dt_min = max(0.1, (tail.index[-1] - tail.index[0]).total_seconds() / 60.0)
+            slope = (tail["pred_idx_mold_h"].iloc[-1] - tail["pred_idx_mold_h"].iloc[0]) / dt_min
+            eta_min = None
+            last = plot_df.iloc[-1]
+            if last["pred_idx_mold_h"] >= ALERT_THRESHOLD:
+                eta_min = 0.0
+            elif slope > 1e-6:
+                eta_min = (ALERT_THRESHOLD - last["pred_idx_mold_h"]) / slope
+            eta_label = f"{eta_min:.1f} min" if eta_min is not None else "n/a"
+            st.caption(f"ETA to predicted threshold ({ALERT_THRESHOLD:.2f}): {eta_label}")
 
-    st.subheader("Controls")
-    st.caption("Use the synthetic generator CLI to switch scenarios or start/stop accelerated demo.")
-    st.code(
-        "python -m analytics.synthetic.scenario_generator --api-url http://localhost:8000 --scenario MOLD_EPISODE --rate-sec 1",
-        language="bash",
-    )
-
-with tab_ml:
-    st.subheader("ML Demo: Mold Forecasting (Predictive Maintenance)")
-    st.caption("This view replays a trained model's predictions from synthetic episodes.")
-
-    eval_path = "/home/amrik/code/smart-campus/data/mold_eval.csv"
-    metrics_path = "/home/amrik/code/smart-campus/data/mold_metrics.json"
-
-    if not os.path.exists(eval_path):
-        st.warning("Run ./scripts/train_mold_demo.sh to generate ML demo outputs.")
-        st.stop()
-
-    df = pd.read_csv(eval_path, parse_dates=["ts"])
-    scenarios = sorted(df["scenario"].unique().tolist())
-
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
-        scenario = st.selectbox("Scenario", scenarios, index=0)
-    with col_b:
-        window_minutes = st.slider("Window (minutes)", 60, 360, 300, step=30)
-    with col_c:
-        speed = st.slider("Playback speed (x)", 1, 10, 5)
-
-    threshold = st.slider("Alert threshold", 0.4, 0.9, 0.6, step=0.05)
-
-    if "demo_running" not in st.session_state:
-        st.session_state.demo_running = False
-    if "demo_idx" not in st.session_state:
-        st.session_state.demo_idx = 0
-
-    start_col, stop_col, reset_col = st.columns(3)
-    with start_col:
-        if st.button("Start"):
-            st.session_state.demo_running = True
-    with stop_col:
-        if st.button("Stop"):
-            st.session_state.demo_running = False
-    with reset_col:
-        if st.button("Reset"):
-            st.session_state.demo_idx = 0
-
-    def _rerun() -> None:
-        if hasattr(st, "rerun"):
-            st.rerun()
+            gauge_left, gauge_right = st.columns([1, 2])
+            with gauge_left:
+                st.metric("ETA to Alert", eta_label)
+            with gauge_right:
+                progress = min(1.0, max(0.0, last["pred_idx_mold_h"] / ALERT_THRESHOLD))
+                st.progress(progress, text=f"Predicted risk vs threshold ({last['pred_idx_mold_h']:.2f} / {ALERT_THRESHOLD:.2f})")
         else:
-            st.experimental_rerun()
+            st.caption("ETA to predicted threshold: n/a")
 
-    if st.session_state.demo_running:
-        time.sleep(1.0 / max(1, speed))
-        _rerun()
+    st.divider()
 
-# Global auto-refresh for live streaming
+    left, right = st.columns([2, 1])
+    with left:
+        st.subheader("Telemetry Snapshot")
+        st.dataframe(pd.DataFrame([latest_local["normalized"]]), use_container_width=True)
+    with right:
+        st.subheader("Health Flags")
+        if latest_local.get("warnings"):
+            st.json(latest_local["warnings"], expanded=False)
+        else:
+            st.success("All sensors nominal")
+        st.caption(f"Data trust: {latest_local['health'].get('data_trust_level')}")
+
+        st.subheader("Event Times")
+        events = latest_local.get("event_times", {})
+        st.write(f"Pred cross: {events.get('pred_cross_ts')}")
+        st.write(f"Pred resolve: {events.get('pred_resolve_ts')}")
+        st.write(f"Actual cross: {events.get('actual_cross_ts')}")
+        st.write(f"Actual resolve: {events.get('actual_resolve_ts')}")
+
+
+tab_live, tab_demo = st.tabs(["Live Sensors", "Controlled Demo"])
+with tab_live:
+    if latest.get("status") in ("empty", "error"):
+        st.info("Waiting for live sensor data...")
+    else:
+        live_id = latest["normalized"]["air_node_id"]
+        render_view("Live Sensor Stream", live_id)
+
+with tab_demo:
+    render_view("Controlled Mold Episode (SIM-001)", "SIM-001")
+
+st.caption("Run demo stream: `python scripts/run_demo.py --sequence NORMAL:60,MOLD_EPISODE:120 --model lgbm`")
+
 if auto_refresh:
     time.sleep(float(refresh_sec))
     if hasattr(st, "rerun"):
         st.rerun()
     else:
         st.experimental_rerun()
-
-    scenario_df = df[df["scenario"] == scenario].sort_values("ts").reset_index(drop=True)
-    if scenario_df.empty:
-        st.warning("No data for selected scenario.")
-        st.stop()
-
-    # Advance pointer
-    st.session_state.demo_idx = min(
-        st.session_state.demo_idx + (1 if st.session_state.demo_running else 0),
-        len(scenario_df) - 1,
-    )
-
-    current_ts = scenario_df.loc[st.session_state.demo_idx, "ts"]
-    window_start = current_ts - timedelta(minutes=window_minutes)
-    window_df = scenario_df[scenario_df["ts"] >= window_start]
-
-    # Predictive maintenance cards
-    latest_row = window_df.iloc[-1]
-    latest_pred = latest_row["pred_idx_mold_h"]
-    latest_actual = latest_row["target_idx_mold_h"]
-
-    # Lead time estimate: first predicted vs actual threshold crossing within episode
-    pred_cross = scenario_df[scenario_df["pred_idx_mold_h"] >= threshold]
-    actual_cross = scenario_df[scenario_df["target_idx_mold_h"] >= threshold]
-    if not pred_cross.empty and not actual_cross.empty:
-        lead_min = (actual_cross.iloc[0]["ts"] - pred_cross.iloc[0]["ts"]).total_seconds() / 60.0
-    else:
-        lead_min = 0.0
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Latest Predicted Risk", f"{latest_pred:.3f}")
-    c2.metric("Latest Actual Risk", f"{latest_actual:.3f}")
-    c3.metric("Lead Time (min)", f"{lead_min:.1f}")
-
-    st.divider()
-
-    st.caption(
-        f"Playback index: {st.session_state.demo_idx + 1}/{len(scenario_df)} | Current time: {current_ts}"
-    )
-    if scenario == "NORMAL":
-        st.info("NORMAL scenario stays near zero risk. Switch to MOLD_EPISODE to see rising risk.")
-
-    chart_df = window_df.set_index("ts")[["target_idx_mold_h", "pred_idx_mold_h"]]
-    st.line_chart(chart_df)
-    st.caption(f"Threshold = {threshold:.2f} | Window ending at {current_ts}")
-
-    if os.path.exists(metrics_path):
-        st.subheader("Model Metrics")
-        with open(metrics_path, "r", encoding="utf-8") as f:
-            st.json(f.read(), expanded=False)

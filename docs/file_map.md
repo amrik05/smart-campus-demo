@@ -4,7 +4,7 @@ This is a low-level map of the repo, with purpose and integration notes.
 
 ## Root
 - `README.md`: Quickstart + top-level usage.
-- `docker-compose.yml`: Runs FastAPI ingest and Streamlit dashboard, shared SQLite file in `./data/`.
+- `docker-compose.yml`: Legacy container setup (optional).
 - `.gitignore`: Python/SQLite artifacts.
 
 ## docs/
@@ -24,13 +24,16 @@ This is a low-level map of the repo, with purpose and integration notes.
 - `firmware/shared/payload_schema.h`: Shared schema notes for payload fields.
 
 ## cloud/ingest_api/
-FastAPI service. Mounts SQLite at `/data/smart_campus.db` in docker-compose.
+FastAPI service. In-memory pipeline for demo correctness (SQLite optional).
 
-- `cloud/ingest_api/app/main.py`: FastAPI app + startup DB init.
+- `cloud/ingest_api/app/main.py`: FastAPI app.
 - `cloud/ingest_api/app/db.py`: SQLAlchemy engine/session.
 - `cloud/ingest_api/app/models.py`: SQLAlchemy models.
 - `cloud/ingest_api/app/schemas.py`: Pydantic input/output schemas.
-- `cloud/ingest_api/app/routes.py`: `/telemetry` endpoint, QC, indices, forecast, alerts.
+- `cloud/ingest_api/app/routes.py`: `/telemetry` endpoint, normalization, features, indices, forecast, alerts.
+- `cloud/ingest_api/app/pipeline.py`: Pipeline stages (normalize, features, indices, forecast, alert).
+- `cloud/ingest_api/app/state.py`: In-memory state and rolling buffers.
+- `cloud/ingest_api/app/rolling.py`: Rolling window stats.
 - `cloud/ingest_api/app/settings.py`: Config via env vars.
 - `cloud/ingest_api/tests/test_schema_validation.py`: Basic schema validation tests.
 - `cloud/ingest_api/requirements.txt`: API dependencies.
@@ -38,12 +41,11 @@ FastAPI service. Mounts SQLite at `/data/smart_campus.db` in docker-compose.
 
 Integration flow:
 1. POST `/telemetry` -> Pydantic validation.
-2. Raw row stored to `raw_telemetry`.
-3. QC flags + sensor health score computed.
-4. Mold + water risk indices computed.
-5. Baseline forecast computed for mold index.
-6. Alerts emitted for consecutive threshold breaches.
-7. Results stored in `features`, `predictions`, `alerts` tables.
+2. Normalize + clamp.
+3. Feature engineering + indices.
+4. Forecast mold risk.
+5. Predictive alerting with persistence.
+6. Latest + history kept in memory for dashboard.
 
 ## analytics/
 Local Python modules used by ingest and generator.
@@ -66,13 +68,12 @@ Integration notes:
 ## app/dashboard_streamlit/
 Streamlit dashboard.
 
-- `app/dashboard_streamlit/app.py`: Dashboard views and queries to SQLite.
+- `app/dashboard_streamlit/app.py`: Dashboard views and API polling.
 - `app/dashboard_streamlit/requirements.txt`: Dashboard deps.
 - `app/dashboard_streamlit/Dockerfile`: Container for Streamlit.
 
 Integration notes:
-- Reads same SQLite DB as ingest via `DATABASE_URL` env.
-- Uses simple SQL queries to show latest telemetry, indices, forecasts, alerts.
+- Polls ingest API for latest + history.
 
 ## ML Demo
 - `docs/ml_demo.md`: ML training flow, imputation, and metrics.

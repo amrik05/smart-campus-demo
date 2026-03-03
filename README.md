@@ -3,24 +3,29 @@
 Demo-first monorepo for an IoT dual-node system:
 Water node -> BLE -> Air node -> WiFi -> Cloud API -> Analytics -> Alerts -> Dashboard.
 
-## Quickstart Demo
+## Quickstart Demo (Pure Python)
 
-1. Start services
+1. Install deps
 
 ```bash
-cd /home/amrik/code/smart-campus
-docker-compose up --build
+pip install -r requirements.txt
 ```
 
-2. Run synthetic generator (accelerated time: 1 sec = 1 min)
+2. Run the all-in-one demo (API + dashboard + generator)
 
 ```bash
-python -m analytics.synthetic.scenario_generator --api-url http://localhost:8000 --scenario MOLD_EPISODE --rate-sec 1
+python scripts/run_demo.py --sequence NORMAL:30,MOLD_EPISODE:90
 ```
 
 3. Open dashboard
 
 - Streamlit: http://localhost:8501
+
+## Docker (Optional)
+
+```bash
+docker-compose up --build
+```
 
 ## Repo Structure
 
@@ -33,7 +38,7 @@ python -m analytics.synthetic.scenario_generator --api-url http://localhost:8000
 ## Notes
 
 - Demo is deterministic and accelerated (1 sec = 1 min)
-- REST ingestion is real; storage and analytics are real
+- REST ingestion is real; storage is optional for now
 - Hardware is stubbed but payloads are realistic and consistent
 
 ## Repo File Map

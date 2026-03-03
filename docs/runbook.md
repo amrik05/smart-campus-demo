@@ -17,6 +17,9 @@
 ## Useful Commands
 
 ```bash
+# Run all-in-one demo
+python scripts/run_demo.py --sequence NORMAL:30,MOLD_EPISODE:90
+
 # Check tables
 sqlite3 /data/smart_campus.db '.tables'
 

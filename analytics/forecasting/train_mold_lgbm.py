@@ -56,8 +56,10 @@ def main() -> None:
         dtrain,
         valid_sets=[dval],
         num_boost_round=200,
-        early_stopping_rounds=20,
-        verbose_eval=False,
+        callbacks=[
+            lgb.early_stopping(20),
+            lgb.log_evaluation(period=0),
+        ],
     )
 
     preds = model.predict(X_test)
