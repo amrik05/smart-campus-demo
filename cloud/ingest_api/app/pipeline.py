@@ -42,6 +42,8 @@ def _utc_now() -> datetime:
 
 
 def _normalize_ts(ts: datetime) -> datetime:
+    if isinstance(ts, str):
+        ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
     if ts.tzinfo is None:
         return ts.replace(tzinfo=timezone.utc)
     return ts.astimezone(timezone.utc)

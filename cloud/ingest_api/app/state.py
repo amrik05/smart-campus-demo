@@ -44,6 +44,9 @@ class GlobalState:
     nodes: Dict[str, NodeCache] = field(default_factory=dict)
     latest_response: Optional[dict] = None
     history: Deque[dict] = field(default_factory=lambda: deque(maxlen=2000))
+    latest_air_raw: Optional[dict] = None
+    latest_water_raw: Optional[dict] = None
+    latest_live_path: Optional[str] = None
 
     def get_node(self, air_node_id: str) -> NodeCache:
         if air_node_id not in self.nodes:
@@ -53,6 +56,15 @@ class GlobalState:
     def add_history(self, payload: dict) -> None:
         self.latest_response = payload
         self.history.append(payload)
+        if self.latest_live_path:
+            try:
+                import json
+                from pathlib import Path
+
+                Path(self.latest_live_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(self.latest_live_path).write_text(json.dumps(payload, default=str, indent=2))
+            except Exception:
+                pass
 
     def get_latest_for_node(self, air_node_id: str) -> Optional[dict]:
         if not self.history:

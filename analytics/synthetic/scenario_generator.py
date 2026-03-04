@@ -52,9 +52,9 @@ def build_payload(
     tds = 350.0 + rng.uniform(-20.0, 20.0)
 
     if scenario == "MOLD_EPISODE":
-        # Slow ramp + higher plateau to ensure current crosses threshold later
-        ramp = min(1.0, max(0.0, (step - 10) / 90.0))
-        air_rh = 60.0 + 34.0 * ramp + rng.uniform(-0.5, 0.5)
+        # Faster ramp for 1-minute demo: ensure threshold crossing within 60s
+        ramp = min(1.0, max(0.0, (step - 5) / 40.0))
+        air_rh = 62.0 + 36.0 * ramp + rng.uniform(-0.4, 0.4)
         air_temp = 23.0 + rng.uniform(-0.15, 0.15)
     elif scenario == "WATER_EVENT":
         turb = 5.0 + 1.2 * step + rng.uniform(-2.0, 2.0)
@@ -72,7 +72,7 @@ def build_payload(
     air_co2 = _clip(_quantize(620.0 + rng.uniform(-40.0, 40.0), 1.0), 400.0, 2000.0)
     air_voc_index = _clip(_quantize(120.0 + rng.uniform(-30.0, 30.0), 1.0), 0.0, 500.0)
     # Surface temp drifts down during mold episode to reduce dew margin
-    surface_delta = -0.6 - (0.006 * step if scenario == "MOLD_EPISODE" else 0.0)
+    surface_delta = -0.6 - (0.01 * step if scenario == "MOLD_EPISODE" else 0.0)
     air_surface_temp = _clip(_quantize(air_temp + surface_delta + rng.uniform(-0.1, 0.1), 0.1), -20.0, 80.0)
 
     outdoor_temp = _quantize(10.0 + 5.0 * math.sin(step / 30.0) + rng.uniform(-0.5, 0.5), 0.1)

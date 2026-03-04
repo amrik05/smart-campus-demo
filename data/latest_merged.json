@@ -1,0 +1,78 @@
+{
+  "normalized": {
+    "ts": "2026-03-04 08:19:15.995732+00:00",
+    "ingest_ts": "2026-03-04 08:19:15.996143+00:00",
+    "building_id": "RUTGERS-ENG-1",
+    "air_node_id": "LIVE-001",
+    "water_node_id": "WATER-LIVE-001",
+    "scenario": "NORMAL",
+    "episode_id": "live_stream",
+    "data_source": "LIVE",
+    "seq_water": 0,
+    "rssi_ble": null,
+    "battery_mv": null,
+    "flags": null,
+    "site_id": "RUTGERS",
+    "building_zone": "ENG-1-BASEMENT",
+    "outdoor_temp_c": null,
+    "outdoor_rh_pct": null,
+    "outdoor_dew_point_c": null,
+    "tod_sin": null,
+    "tod_cos": null,
+    "dow_sin": null,
+    "dow_cos": null,
+    "air_temp_c": 22.57,
+    "air_rh_pct": 34.99,
+    "air_surface_temp_c": 22.57,
+    "air_co2_ppm": 600.0,
+    "air_voc_index": 309.84,
+    "water_turbidity_ntu": 3919.0,
+    "water_tds_ppm": 33.0,
+    "water_temp_c": 21.06,
+    "water_free_chlorine_mgL": 1.0
+  },
+  "features": {
+    "dew_point_c": 6.32367871049888,
+    "dew_margin_c": 16.246321289501118,
+    "window_s": 300.0,
+    "rh_mean_w": 34.8127485380117,
+    "rh_std_w": 0.5830800983576709,
+    "rh_slope_w": 0.5660285646995897,
+    "temp_slope_w": -0.343860367153985,
+    "dew_point_slope_w": -0.06232070393121643,
+    "dew_margin_slope_w": -0.28153966322276874,
+    "rh_time_above_70_w": 0.0,
+    "dew_margin_time_below_0_w": 0.0,
+    "air_rh_pct_t_minus_1": 35.85,
+    "air_rh_pct_t_minus_5": 34.99,
+    "dew_margin_c_t_minus_5": 16.246321289501118,
+    "idx_mold_now_t_minus_5": 0.0,
+    "idx_mold_now": 0.0,
+    "idx_water_event_now": 0.5066
+  },
+  "prediction": {
+    "target": "idx_mold",
+    "horizon_min": 30,
+    "yhat": 0.11999999999999997,
+    "model_name": "trend_extrap_v1",
+    "model_version": "1.0"
+  },
+  "health": {
+    "score": 1.0,
+    "warnings": {},
+    "data_trust_level": "GOOD"
+  },
+  "alert_state": {
+    "open": false,
+    "threshold": 0.8,
+    "persistence_n": 3
+  },
+  "event_times": {
+    "pred_cross_ts": null,
+    "pred_resolve_ts": null,
+    "actual_cross_ts": null,
+    "actual_resolve_ts": null
+  },
+  "alert": null,
+  "warnings": {}
+}

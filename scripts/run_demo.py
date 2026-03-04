@@ -59,20 +59,27 @@ def _wait_for_api(api_url: str, timeout_s: float = 15.0) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run full Smart Campus demo (API + Streamlit + generator)")
-    parser.add_argument("--api-host", default="127.0.0.1")
-    parser.add_argument("--api-port", type=int, default=8000)
+    parser.add_argument("--api-host", default="0.0.0.0")
+    parser.add_argument("--api-port", type=int, default=8001)
+    parser.add_argument("--api-url", default="", help="Override API URL for Streamlit (e.g., http://127.0.0.1:8001)")
     parser.add_argument("--streamlit-port", type=int, default=8501)
     parser.add_argument("--rate-sec", type=float, default=1.0)
     parser.add_argument("--sequence", default="NORMAL:60,MOLD_EPISODE:120")
     parser.add_argument("--scenario", default="")
     parser.add_argument("--episode-id", default=None)
     parser.add_argument("--no-streamlit", action="store_true")
+    parser.add_argument("--no-demo", action="store_true", help="Do not run synthetic demo generator")
     parser.add_argument("--model", default="baseline", choices=["baseline", "lgbm"])
     parser.add_argument("--model-path", default="models/mold_lgbm.txt")
     parser.add_argument("--keep-alive", action="store_true")
     args = parser.parse_args()
 
-    api_url = f"http://{args.api_host}:{args.api_port}"
+    if args.api_url:
+        api_url = args.api_url
+    else:
+        # Streamlit should use localhost even if API binds to 0.0.0.0
+        api_host_for_url = "127.0.0.1" if args.api_host == "0.0.0.0" else args.api_host
+        api_url = f"http://{api_host_for_url}:{args.api_port}"
 
     os.environ["MODEL_MODE"] = args.model
     os.environ["MODEL_PATH"] = args.model_path
@@ -87,38 +94,39 @@ def main() -> None:
     _wait_for_api(api_url, timeout_s=15.0)
 
     try:
-        if args.scenario:
-            run_generator(
-                api_url,
-                args.scenario.upper(),
-                args.rate_sec,
-                0,
-                42,
-                args.episode_id,
-                "SIM-001",
-                "WATER-001",
-                "RUTGERS-ENG-1",
-                "RUTGERS",
-                "ENG-1-BASEMENT",
-            )
-        else:
-            parts = []
-            for chunk in args.sequence.split(","):
-                name, dur = chunk.split(":")
-                parts.append((name.upper(), int(dur)))
-            run_sequence(
-                api_url,
-                parts,
-                args.rate_sec,
-                42,
-                "SIM-001",
-                "WATER-001",
-                "RUTGERS-ENG-1",
-                "RUTGERS",
-                "ENG-1-BASEMENT",
-            )
+        if not args.no_demo:
+            if args.scenario:
+                run_generator(
+                    api_url,
+                    args.scenario.upper(),
+                    args.rate_sec,
+                    0,
+                    42,
+                    args.episode_id,
+                    "SIM-001",
+                    "WATER-001",
+                    "RUTGERS-ENG-1",
+                    "RUTGERS",
+                    "ENG-1-BASEMENT",
+                )
+            else:
+                parts = []
+                for chunk in args.sequence.split(","):
+                    name, dur = chunk.split(":")
+                    parts.append((name.upper(), int(dur)))
+                run_sequence(
+                    api_url,
+                    parts,
+                    args.rate_sec,
+                    42,
+                    "SIM-001",
+                    "WATER-001",
+                    "RUTGERS-ENG-1",
+                    "RUTGERS",
+                    "ENG-1-BASEMENT",
+                )
 
-        if args.keep_alive:
+        if args.keep_alive or args.no_demo:
             while True:
                 time.sleep(1.0)
     except KeyboardInterrupt:

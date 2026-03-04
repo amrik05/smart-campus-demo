@@ -20,7 +20,7 @@
 // ===== WiFi + API config =====
 const char* WIFI_SSID = "48 Hunt 2.4";
 const char* WIFI_PASS = "gooner41";
-const char* API_HOST = "192.168.1.218";  // laptop/server IP
+const char* API_HOST = "192.168.1.167";  // laptop/server IP
 const int API_PORT = 8001;
 const char* API_PATH = "/telemetry/air";
 
