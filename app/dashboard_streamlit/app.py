@@ -93,8 +93,8 @@ def render_view(title: str, air_node_id: str, base: str = "") -> None:
     top_a.metric("RH %", f"{rh_val:.1f}")
     top_b.metric("Dew Margin C", f"{dew_margin:.2f}")
     top_c.metric("Mold Risk (Now)", f"{idx_now:.3f}")
-    horizon = latest_local["prediction"]["horizon_min"]
-    top_d.metric(f"Predicted +{horizon}m", f"{pred:.3f}")
+    display_horizon = 25
+    top_d.metric(f"Predicted +{display_horizon}m", f"{pred:.3f}")
     top_e.metric("Health Score", f"{latest_local['health']['score']:.2f}")
 
     meta_a, meta_b, meta_c = st.columns(3)
@@ -114,8 +114,14 @@ def render_view(title: str, air_node_id: str, base: str = "") -> None:
 
         risk_df = plot_df.reset_index()[["ts", "idx_mold_now", "pred_idx_mold_h", "threshold"]]
         risk_long = risk_df.melt("ts", var_name="series", value_name="value")
+        series_map = {
+            "idx_mold_now": "Current Mold Risk",
+            "pred_idx_mold_h": "Predicted Mold Risk",
+            "threshold": "Alert Threshold",
+        }
+        risk_long["series"] = risk_long["series"].map(series_map).fillna(risk_long["series"])
         color_scale = alt.Scale(
-            domain=["idx_mold_now", "pred_idx_mold_h", "threshold"],
+            domain=["Current Mold Risk", "Predicted Mold Risk", "Alert Threshold"],
             range=["#1f77b4", "#ff7f0e", "#d62728"],
         )
         risk_chart = (
@@ -189,11 +195,11 @@ with tab_mold:
     st.subheader("Predictive Mold Risk")
     col_a, col_b, col_c = st.columns(3)
     with col_a:
-        if st.button("Start 1‑min Demo (30‑min lead)"):
+        if st.button("Start 40‑sec Demo (30‑min lead)"):
             try:
                 requests.post(
                     f"{API_URL}/demo/start",
-                    params={"sequence": "NORMAL:10,MOLD_EPISODE:50", "rate_sec": 1.0, "speed": 120.0},
+                    params={"sequence": "NORMAL:6,MOLD_EPISODE:34", "rate_sec": 1.0, "speed": 120.0},
                 )
             except Exception:
                 pass

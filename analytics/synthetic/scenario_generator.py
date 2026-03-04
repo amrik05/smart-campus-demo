@@ -52,8 +52,8 @@ def build_payload(
     tds = 350.0 + rng.uniform(-20.0, 20.0)
 
     if scenario == "MOLD_EPISODE":
-        # Faster ramp for 1-minute demo: ensure threshold crossing within 60s
-        ramp = min(1.0, max(0.0, (step - 5) / 40.0))
+        # Faster ramp for short demo: ensure threshold crossing within ~40s
+        ramp = min(1.0, max(0.0, (step - 3) / 24.0))
         air_rh = 62.0 + 36.0 * ramp + rng.uniform(-0.4, 0.4)
         air_temp = 23.0 + rng.uniform(-0.15, 0.15)
     elif scenario == "WATER_EVENT":

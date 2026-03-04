@@ -83,6 +83,8 @@ def main() -> None:
 
     os.environ["MODEL_MODE"] = args.model
     os.environ["MODEL_PATH"] = args.model_path
+    if "DEMO_FORECAST_HORIZON_MIN" not in os.environ:
+        os.environ["DEMO_FORECAST_HORIZON_MIN"] = "30"
     if args.model == "lgbm" and "FORECAST_HORIZON_MIN" not in os.environ:
         os.environ["FORECAST_HORIZON_MIN"] = "60"
 

@@ -1,26 +1,18 @@
 {
-  "saved_ts": "2026-03-04T08:19:15.995741+00:00",
+  "saved_ts": "2026-03-04T08:46:19.537381+00:00",
   "live_sensor_data": {
-    "air": {
-      "ts": "2026-03-04T08:19:15.995741+00:00",
-      "payload": {
-        "air_temp_c": 22.57,
-        "air_rh_pct": 34.99,
-        "air_voc_raw": 30984,
-        "ts": "2026-03-04 08:19:15.995732+00:00"
-      }
-    },
+    "air": null,
     "water": {
-      "ts": "2026-03-04T08:19:15.709827+00:00",
+      "ts": "2026-03-04T08:46:19.537381+00:00",
       "payload": {
-        "surface_temp_c": 21.06,
-        "turbidity_raw": 3919,
-        "tds_raw": 33,
-        "turbidity_v": 3.1582,
-        "tds_v": 0.0266,
-        "ts": "2026-03-04 08:19:15.709814+00:00"
+        "surface_temp_c": 22.5,
+        "turbidity_raw": 2137,
+        "tds_raw": 0,
+        "turbidity_v": 1.7221,
+        "tds_v": 0.0,
+        "ts": "2026-03-04 08:46:19.537365+00:00"
       }
     }
   },
-  "last_endpoint": "/telemetry/air"
+  "last_endpoint": "/telemetry/water"
 }
