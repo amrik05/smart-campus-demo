@@ -12,9 +12,9 @@ OneWire oneWire(ONE_WIRE_PIN);
 DallasTemperature ds18b20(&oneWire);
 
 // ===== WiFi + API config =====
-const char* WIFI_SSID = "48 Hunt 2.4";
-const char* WIFI_PASS = "gooner41";
-const char* API_HOST = "192.168.1.218";
+const char* WIFI_SSID = "";
+const char* WIFI_PASS = "";
+const char* API_HOST = "";
 const int   API_PORT = 8001;
 const char* API_PATH = "/telemetry/water/raw";
 
